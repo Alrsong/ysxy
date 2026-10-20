@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>不思议迷宫 · 地牢玩法设计拆解</title>
+<meta name="description" content="面向游戏设计从业者的《不思议迷宫》地牢玩法系统拆解：核心循环、探索机制、战斗系统、成长结构、迷宫差异化与可借鉴设计点。">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231E241C'/%3E%3Ccircle cx='32' cy='32' r='20' fill='%235F8A4B'/%3E%3Ccircle cx='32' cy='32' r='13' fill='%23F5F0E6'/%3E%3Ctext x='32' y='40' font-size='24' font-weight='bold' text-anchor='middle' fill='%23B97A2A'%3E%3F%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://miaoda.feishu.cn">
+<link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Noto+Serif+SC:wght@600;700;900&family=Noto+Sans+SC:wght@400;500;700&display=swap">
+<style>
+:root{
+  --paper:#F5F0E6; --paper-2:#EDE5D3; --paper-3:#E2D7BE;
+  --ink:#22261F; --ink-2:#565B4F; --ink-3:#8B9083;
+  --amber:#B97A2A; --amber-deep:#8F5B1D; --amber-soft:#EAD9B8;
+  --green:#5F8A4B; --green-deep:#46693A; --green-soft:#DDE7D2;
+  --teal:#3F6B70; --teal-soft:#D5E3E0;
+  --dark:#1E241C; --dark-2:#293228; --dark-3:#343F30;
+  --line:#D9CFB8; --white:#FFFDF7;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:var(--paper);color:var(--ink);font-family:"Noto Sans SC",system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;font-size:16px;line-height:1.75;-webkit-font-smoothing:antialiased}
+.serif{font-family:"Noto Serif SC","Noto Sans SC",serif}
+.shell{max-width:1160px;margin:0 auto;padding:0 24px}
+a{color:var(--amber-deep);text-decoration:none;border-bottom:1px solid transparent}
+a:hover{border-bottom-color:currentColor}
+img{max-width:100%;display:block}
+::selection{background:var(--amber-soft)}
+
+/* ===== 顶部导航 ===== */
+.nav{position:sticky;top:0;z-index:50;background:var(--dark);color:#EDE7D8;border-bottom:1px solid rgba(255,255,255,.08)}
+.nav-in{max-width:1160px;margin:0 auto;padding:0 24px;display:flex;align-items:center;gap:18px;height:56px}
+.nav-brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:15px;letter-spacing:.02em;white-space:nowrap}
+.nav-brand .dot{width:10px;height:10px;border-radius:3px;background:var(--green);flex:none}
+.nav-links{display:flex;gap:2px;margin-left:auto;overflow-x:auto;scrollbar-width:none}
+.nav-links::-webkit-scrollbar{display:none}
+.nav-links a{color:#C9C4B4;font-size:13px;padding:6px 10px;border-radius:6px;white-space:nowrap;border-bottom:none}
+.nav-links a:hover{color:#fff;background:rgba(255,255,255,.08)}
+.nav-links a.on{color:#fff;background:var(--green-deep)}
+.nav-toggle{display:none;background:none;border:1px solid rgba(255,255,255,.25);color:#EDE7D8;border-radius:8px;padding:6px 12px;font-size:14px;cursor:pointer}
+
+/* ===== Hero ===== */
+.hero{background:radial-gradient(1200px 500px at 80% -10%, var(--dark-3), var(--dark) 60%), var(--dark);color:#EDE7D8;padding:72px 0 56px;overflow:hidden}
+.hero-grid{display:grid;grid-template-columns:1fr 300px;gap:40px;align-items:center}
+.hero-kicker{display:inline-flex;align-items:center;gap:8px;font-size:13px;letter-spacing:.14em;color:var(--amber);border:1px solid rgba(185,122,42,.45);border-radius:999px;padding:6px 14px;margin-bottom:22px}
+.hero h1{font-family:"Noto Serif SC",serif;font-weight:900;font-size:44px;line-height:1.2;letter-spacing:.02em}
+.hero h1 .en{display:block;font-size:15px;font-weight:600;color:#AFA990;letter-spacing:.3em;margin-bottom:14px}
+.hero-sub{margin-top:16px;font-size:17px;color:#C7C1AF;max-width:640px}
+.hero-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:22px}
+.hero-tags span{font-size:12.5px;color:#D8D2BE;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:5px 12px}
+.hero-stats{margin-top:44px;display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.stat{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:16px 18px}
+.stat b{display:block;font-family:"Noto Serif SC",serif;font-size:26px;font-weight:900;color:var(--amber)}
+.stat span{font-size:12.5px;color:#AFA990}
+.hero-icon{display:flex;justify-content:center}
+.hero-icon img{width:220px;height:220px;border-radius:24px;border:1px solid rgba(255,255,255,.14);box-shadow:0 24px 60px rgba(0,0,0,.45)}
+
+/* ===== 章节通用 ===== */
+.section{padding:72px 0;border-bottom:1px solid var(--line)}
+.sec-head{display:flex;align-items:baseline;gap:16px;margin-bottom:14px}
+.sec-num{font-family:"Noto Serif SC",serif;font-weight:900;font-size:15px;color:var(--amber);letter-spacing:.1em}
+.sec-head h2{font-family:"Noto Serif SC",serif;font-size:30px;font-weight:900;letter-spacing:.01em}
+.sec-rule{height:3px;width:64px;background:linear-gradient(90deg,var(--amber),transparent);border-radius:2px;margin-bottom:22px}
+.lede{font-size:16.5px;color:var(--ink-2);max-width:780px;margin-bottom:30px}
+.lede b{color:var(--ink)}
+h3.block{font-family:"Noto Serif SC",serif;font-size:19px;font-weight:700;margin:34px 0 12px;display:flex;align-items:center;gap:10px}
+h3.block::before{content:"";width:8px;height:8px;border-radius:2px;background:var(--green);flex:none}
+p.body{color:var(--ink-2);max-width:820px;margin-bottom:12px}
+p.body b{color:var(--ink)}
+.small{font-size:13px;color:var(--ink-3)}
+.tag{display:inline-block;font-size:12px;font-weight:500;color:var(--green-deep);background:var(--green-soft);border-radius:6px;padding:3px 10px;white-space:nowrap}
+.tag.amber{color:var(--amber-deep);background:var(--amber-soft)}
+.tag.teal{color:var(--teal);background:var(--teal-soft)}
+.tag.ink{color:#fff;background:var(--dark-2)}
+.mt{margin-top:18px}.mb{margin-bottom:18px}
+
+/* ===== 卡片 ===== */
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.card{background:var(--paper-2);border:1px solid var(--line);border-radius:14px;padding:20px 20px 18px}
+.card h4{font-family:"Noto Serif SC",serif;font-size:16.5px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.card p{font-size:14px;color:var(--ink-2)}
+.card .ic{width:26px;height:26px;flex:none;border-radius:8px;display:flex;align-items:center;justify-content:center;background:var(--green-soft)}
+.cards.g2{grid-template-columns:repeat(2,1fr)}
+.cards.g4{grid-template-columns:repeat(4,1fr)}
+
+/* ===== 表格 ===== */
+.tbl-wrap{overflow-x:auto;max-width:100%;margin:16px 0;border:1px solid var(--line);border-radius:12px;background:var(--white)}
+table.tbl{width:100%;border-collapse:collapse;table-layout:fixed;min-width:640px;font-size:13.5px}
+table.tbl th{background:var(--dark);color:#EFE9DA;text-align:left;padding:10px 12px;font-weight:500;font-size:13px;letter-spacing:.02em}
+table.tbl td{padding:10px 12px;border-top:1px solid var(--line);vertical-align:top;color:var(--ink-2)}
+table.tbl tr:nth-child(even) td{background:var(--paper)}
+table.tbl td b{color:var(--ink)}
+table.tbl td .sub{display:block;font-size:12px;color:var(--ink-3);margin-top:2px}
+.tbl-cap{font-size:12.5px;color:var(--ink-3);margin:-6px 0 18px}
+
+/* ===== 图例 / figure ===== */
+figure{margin:24px 0}
+figcaption{font-size:12.5px;color:var(--ink-3);margin-top:10px;text-align:center}
+.fig-frame{background:var(--white);border:1px solid var(--line);border-radius:16px;padding:22px 18px}
+.fig-frame.dark{background:var(--dark);border-color:rgba(255,255,255,.08)}
+
+/* ===== 循环图 ===== */
+.loop-wrap{display:flex;justify-content:center;flex-direction:column;align-items:center}
+.loop-svg{width:100%;max-width:980px;height:auto}
+.loop-legend{display:flex;flex-wrap:wrap;justify-content:center;gap:8px 6px;margin-top:14px;max-width:760px}
+.loop-legend span{font-size:12px;color:#AFA990;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:999px;padding:4px 12px;white-space:nowrap}
+.loop-legend span b{color:#EDE7D8;font-weight:700;margin-right:5px}
+.loop-mobile{display:none;flex-direction:column;gap:8px}
+.step-row{display:flex;gap:10px;align-items:flex-start;background:var(--paper-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13.5px;color:var(--ink-2)}
+.step-row .n{flex:none;width:24px;height:24px;border-radius:7px;background:var(--dark);color:#EFE9DA;font-size:12.5px;display:flex;align-items:center;justify-content:center;font-weight:700}
+
+/* ===== 节奏条 ===== */
+.rhythm{display:flex;gap:0;margin:18px 0}
+.rhy{flex:1;position:relative;text-align:center;padding-top:26px;border-top:3px solid var(--paper-3)}
+.rhy::before{content:"";position:absolute;top:-7px;left:50%;transform:translateX(-50%);width:11px;height:11px;border-radius:50%;background:var(--paper-3)}
+.rhy.boss::before{background:var(--amber);border:2px solid var(--amber-deep);top:-9px;width:15px;height:15px}
+.rhy b{display:block;font-size:14px;color:var(--ink)}
+.rhy span{font-size:12px;color:var(--ink-3)}
+.rhy .flag{display:inline-block;margin-top:6px;font-size:11.5px;background:var(--amber-soft);color:var(--amber-deep);border-radius:999px;padding:2px 10px}
+
+/* ===== 四段状态条（SAN） ===== */
+.san{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:18px 0}
+.san-item{border-radius:12px;padding:14px 14px 12px;border:1px solid var(--line);background:var(--paper-2)}
+.san-item .r{font-size:12px;color:var(--ink-3);font-weight:700}
+.san-item h5{font-size:15px;font-weight:700;margin:4px 0 8px}
+.san-item ul{list-style:none;font-size:12.5px;color:var(--ink-2)}
+.san-item li{padding-left:14px;position:relative;margin-bottom:3px}
+.san-item li::before{content:"";position:absolute;left:0;top:9px;width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.6}
+.san-1{border-top:4px solid var(--green)}
+.san-2{border-top:4px solid var(--amber)}
+.san-3{border-top:4px solid #C7772E}
+.san-4{border-top:4px solid #B0432F}
+.san-4{color:#8A3A2C}
+
+/* ===== 引用块 ===== */
+.quote{border-left:4px solid var(--amber);background:var(--amber-soft);border-radius:0 10px 10px 0;padding:14px 18px;margin:18px 0;font-size:14.5px;color:var(--ink-2)}
+.quote b{color:var(--ink)}
+
+/* ===== 双栏 ===== */
+.two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:start}
+.two>*{min-width:0}
+.tbl-wrap{overflow-x:auto;max-width:100%;margin:16px 0;border:1px solid var(--line);border-radius:12px;background:var(--white)}
+.photos{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.photo{background:var(--dark);border-radius:14px;padding:10px 10px 8px;border:1px solid rgba(255,255,255,.1)}
+.photo img{border-radius:8px;width:100%;max-height:440px;object-fit:contain}
+.photo span{display:block;text-align:center;font-size:12px;color:#AFA990;padding:7px 4px 3px}
+
+/* ===== 迷宫案例卡 ===== */
+.maze-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.maze{border:1px solid var(--line);border-radius:12px;background:var(--paper-2);padding:16px 16px 14px;position:relative;overflow:hidden}
+.maze::after{content:"";position:absolute;right:-18px;top:-18px;width:70px;height:70px;border-radius:50%;background:var(--green-soft);opacity:.5}
+.maze h4{font-size:15.5px;font-weight:700;margin-bottom:4px}
+.maze .theme{font-size:12px;color:var(--amber-deep);font-weight:500;margin-bottom:8px}
+.maze p{font-size:13px;color:var(--ink-2)}
+
+/* ===== 亮点卡 ===== */
+.point{display:grid;grid-template-columns:56px 1fr;gap:16px;padding:20px 0;border-bottom:1px solid var(--line)}
+.point:last-child{border-bottom:none}
+.point .pnum{font-family:"Noto Serif SC",serif;font-size:34px;font-weight:900;color:var(--amber);line-height:1;border-right:2px solid var(--paper-3);padding-right:16px}
+.point h4{font-family:"Noto Serif SC",serif;font-size:18px;font-weight:700;margin-bottom:6px}
+.point p{font-size:14.5px;color:var(--ink-2);margin-bottom:8px}
+.point .tk{font-size:12.5px;color:var(--teal);background:var(--teal-soft);border-radius:6px;padding:3px 10px;display:inline-block}
+
+/* ===== 引用来源 ===== */
+.src-list{list-style:none;font-size:13px;color:var(--ink-2);columns:2;column-gap:32px}
+.src-list li{padding:4px 0 4px 16px;position:relative;break-inside:avoid}
+.src-list li::before{content:"•";position:absolute;left:0;color:var(--amber)}
+.src-list a{color:var(--ink-2);word-break:break-all}
+.src-list a:hover{color:var(--amber-deep)}
+
+/* ===== footer ===== */
+.foot{background:var(--dark);color:#AFA990;padding:40px 0 34px;font-size:13px}
+.foot .shell{display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:center}
+.foot b{color:#EDE7D8;font-weight:700}
+
+/* ===== 返回顶部 ===== */
+#topBtn{position:fixed;right:20px;bottom:20px;width:44px;height:44px;border-radius:12px;background:var(--dark);color:#EDE7D8;border:1px solid rgba(255,255,255,.15);font-size:18px;cursor:pointer;opacity:0;pointer-events:none;transition:opacity .25s;z-index:60}
+#topBtn.show{opacity:1;pointer-events:auto}
+
+/* ===== 滚动揭示 ===== */
+.reveal{opacity:0;transform:translateY(14px);transition:opacity .6s ease,transform .6s ease}
+.reveal.in{opacity:1;transform:none}
+@media (prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}html{scroll-behavior:auto}}
+
+/* ===== 响应式 ===== */
+@media (max-width:1024px){
+  .hero-grid{grid-template-columns:1fr 220px;gap:24px}
+  .cards,.maze-grid{grid-template-columns:repeat(2,1fr)}
+  .cards.g4{grid-template-columns:repeat(2,1fr)}
+  .hero-stats{grid-template-columns:repeat(2,1fr)}
+}
+@media (max-width:820px){
+  .nav-links{display:none;position:absolute;top:56px;left:0;right:0;background:var(--dark);flex-direction:column;padding:10px 16px;gap:4px;border-bottom:1px solid rgba(255,255,255,.08)}
+  .nav-links.open{display:flex}
+  .nav-toggle{display:block;margin-left:auto}
+  .nav-brand{margin-left:0}
+  .hero{padding:52px 0 44px}
+  .hero-grid{grid-template-columns:1fr;gap:26px}
+  .hero-icon{order:-1;justify-content:flex-start}
+  .hero-icon img{width:110px;height:110px;border-radius:16px}
+  .hero h1{font-size:32px}
+  .loop-svg{display:none}
+  .loop-mobile{display:flex}
+  .two{grid-template-columns:1fr}
+  .src-list{columns:1}
+}
+@media (max-width:560px){
+  .section{padding:52px 0}
+  .cards,.cards.g2,.cards.g4,.maze-grid,.san{grid-template-columns:1fr}
+  .sec-head h2{font-size:24px}
+  .photos{grid-template-columns:1fr}
+  .hero-stats{grid-template-columns:repeat(2,1fr);gap:10px}
+  .stat b{font-size:22px}
+  body{font-size:15.5px}
+  .card p,.maze p,.point p,.step-row,.small,.tbl-cap,.san-item ul,.src-list,.hero-tags span{font-size:14px}
+  .lede{font-size:15.5px}
+}
+</style>
+</head>
+<body>
+
+<!-- ===== 顶部导航 ===== -->
+<nav class="nav">
+  <div class="nav-in">
+    <div class="nav-brand"><span class="dot"></span>不思议迷宫 · 地牢玩法拆解</div>
+    <button class="nav-toggle" id="navToggle" aria-label="展开目录">目录</button>
+    <div class="nav-links" id="navLinks">
+      <a href="#s1">概览</a><a href="#s2">核心循环</a><a href="#s3">探索机制</a><a href="#s4">战斗系统</a>
+      <a href="#s5">局内成长</a><a href="#s6">角色系统</a><a href="#s7">局外长线</a><a href="#s8">迷宫差异化</a><a href="#s9">设计亮点</a><a href="#s10">总结</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ===== Hero ===== -->
+<header class="hero">
+  <div class="shell">
+    <div class="hero-grid">
+      <div>
+        <div class="hero-kicker">游戏设计拆解 · DUNGEON DESIGN REVIEW</div>
+        <h1><span class="en">GUMBALLS &amp; DUNGEONS</span>不思议迷宫<br>地牢玩法设计拆解</h1>
+        <p class="hero-sub">以「翻砖」为唯一动作入口的 Roguelike 地牢 RPG——用一张 5×6 棋盘承载战斗、成长、收集与彩蛋，被评价为「轻度的玩法，重度的体验」。</p>
+        <div class="hero-tags">
+          <span>Roguelike + 扫雷 RPG</span><span>31+ 主题迷宫</span><span>200+ 冈布奥</span><span>四阵营灵魂链接</span><span>地图编辑器</span>
+        </div>
+      </div>
+      <div class="hero-icon">
+        <img src="https://media.doubao.com/space/api/box/stream/download/all_by_mount_point/Qg7QbyEF8oJq0QxEwZLc8TvfnJc" alt="不思议迷宫游戏图标">
+      </div>
+    </div>
+    <div class="hero-stats">
+      <div class="stat"><b>2016.12.08</b><span>iOS / Android 双端上线</span></div>
+      <div class="stat"><b>6 天</b><span>登顶 App Store 付费榜</span></div>
+      <div class="stat"><b>1600万+</b><span>累计注册用户（2019.06）</span></div>
+      <div class="stat"><b>最佳核心玩法奖</b><span>中国首届国际移动游戏大奖（2017）</span></div>
+    </div>
+  </div>
+</header>
+
+<!-- ===== 01 游戏概览 ===== -->
+<section class="section" id="s1">
+  <div class="shell">
+    <div class="sec-head reveal"><span class="sec-num">CHAPTER 01</span><h2>游戏概览与定位</h2></div>
+    <div class="sec-rule reveal"></div>
+    <p class="lede reveal">《不思议迷宫》由厦门青瓷数码开发、雷霆游戏发行，2016 年 12 月 8 日上线。它将「Roguelike 随机生成」与「扫雷式翻砖探索」合并成一套核心玩法，并让每一座迷宫拥有独立的文化内核与机制变体——这是其区别于同类地牢游戏的关键设计决策。</p>
+
+    <div class="cards reveal">
+      <div class="card"><h4><span class="ic">开</span>开发商与发行</h4><p>厦门青瓷数码开发，雷霆游戏发行；制作人王威（Peter）。Steam 版（2025.03.05）由 ULTRAPLAYERS 发行，免费上架，仅保留迷宫玩法。</p></div>
+      <div class="card"><h4><span class="ic">源</span>设计基因</h4><p>原型受《地牢爬行》（Dungelot）与《符石守护者》启发，原名《史莱姆大冒险》；关卡设计受《风暴英雄》影响，为每座迷宫注入独有元素与隐藏彩蛋。</p></div>
+      <div class="card"><h4><span class="ic">评</span>业界评价</h4><p>游戏葡萄：「轻度的玩法，重度的体验」；游侠星空：彩蛋令人欲罢不能、新手引导拿捏得当。争议点：无尽模式战线长、被称「肝爆」。</p></div>
+    </div>
+
+    <div class="two reveal" style="margin-top:26px">
+      <div>
+        <h3 class="block">一句话读懂它的玩法结构</h3>
+        <p class="body">玩家操作一个史莱姆形态的「冈布奥」进入地牢，<b>一块块翻开 5×6 棋盘上的地砖</b>：砖下可能是怪物、血瓶、卷轴、钥匙、商店或随机事件。找到钥匙即可进入下一层，每 10 层出现 BOSS；翻完全层可达成「完美击败」获取更多奖励。</p>
+        <p class="body">局内获得的探索点只用于局内购买称号与装备，<b>带不出迷宫</b>；能带出的是食材、矿石与冈布奥碎片——它们被换算成金币和经验，喂给局外的养成系统。单局失败只需重开，但局外积累永存。</p>
+        <p class="body">迷宫之外，还有天空战（飞艇）、伊甸园、命运之链、竞速迷宫等长线玩法；但所有内容都回到同一个入口——<b>进入迷宫、翻砖探索</b>。</p>
+      </div>
+      <div class="quote">
+        <p><b>「生成随机、进程单向、不可挽回」</b>是官方对核心体验的定义：地图、道具、怪物以随机方式登场，玩家只有一次机会，死亡即重来。<br><br>随机是表层，决策才是里层——翻哪块砖、打哪个怪、把探索点投入哪条称号线，才是真正的玩法深度。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 02 核心玩法循环 ===== -->
+<section class="section" id="s2">
+  <div class="shell">
+    <div class="sec-head reveal"><span class="sec-num">CHAPTER 02</span><h2>核心玩法循环：三层循环结构</h2></div>
+    <div class="sec-rule reveal"></div>
+    <p class="lede reveal">地牢玩法的节奏由三层循环嵌套而成：单层探索（分钟级）、单局爬楼（小时级）、长线养成（天/周级）。局内循环产生即时决策，局外循环提供长期目标，中间由「结算」衔接。</p>
+
+    <figure class="fig-frame dark reveal">
+      <div class="loop-wrap">
+        <svg class="loop-svg" viewBox="0 0 1000 470" role="img" aria-label="核心玩法双层循环图">
+          <defs>
+            <marker id="arw" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="#B97A2A"/>
+            </marker>
+          </defs>
+          <!-- 局内环 -->
+          <g font-family="Noto Sans SC,sans-serif">
+            <circle cx="255" cy="235" r="152" fill="none" stroke="#343F30" stroke-width="2" stroke-dasharray="4 6"/>
+            <circle cx="255" cy="235" r="120" fill="none" stroke="#343F30" stroke-width="1" stroke-dasharray="2 4"/>
+            <text x="255" y="30" text-anchor="middle" font-size="15" font-weight="700" fill="#EDE7D8">局内循环 · 每一层</text>
+            <g><circle cx="255" cy="117" r="34" fill="#293228" stroke="#5F8A4B" stroke-width="2"/><text x="255" y="123" text-anchor="middle" font-size="14" font-weight="700" fill="#EDE7D8">翻砖</text></g>
+            <g><circle cx="357" cy="176" r="34" fill="#293228" stroke="#5F8A4B" stroke-width="2"/><text x="357" y="182" text-anchor="middle" font-size="14" font-weight="700" fill="#EDE7D8">遭遇</text></g>
+            <g><circle cx="357" cy="294" r="34" fill="#293228" stroke="#5F8A4B" stroke-width="2"/><text x="357" y="300" text-anchor="middle" font-size="14" font-weight="700" fill="#EDE7D8">决策</text></g>
+            <g><circle cx="255" cy="353" r="34" fill="#293228" stroke="#5F8A4B" stroke-width="2"/><text x="255" y="359" text-anchor="middle" font-size="14" font-weight="700" fill="#EDE7D8">战斗</text></g>
+            <g><circle cx="153" cy="294" r="34" fill="#293228" stroke="#5F8A4B" stroke-width="2"/><text x="153" y="300" text-anchor="middle" font-size="14" font-weight="700" fill="#EDE7D8">收获</text></g>
+            <g><circle cx="153" cy="176" r="34" fill="#293228" stroke="#5F8A4B" stroke-width="2"/><text x="153" y="182" text-anchor="middle" font-size="14" font-weight="700" fill="#EDE7D8">下楼</text></g>
+            <path d="M 255 83 A 152 152 0 0 1 387 159" fill="none" stroke="#B97A2A" stroke-width="2" marker-end="url(#arw)"/>
+            <path d="M 387 159 A 152 152 0 0 1 387 311" fill="none" stroke="#B97A2A" stroke-width="2" marker-end="url(#arw)"/>
+            <path d="M 387 311 A 152 152 0 0 1 255 387" fill="none" stroke="#B97A2A" stroke-width="2" marker-end="url(#arw)"/>
+            <path d="M 255 387 A 152 152 0 0 1 123 311" fill="none" stroke="#B97A2A" stroke-width="2" marker-end="url(#arw)"/>
+            <path d="M 123 311 A 152 152 0 0 1 123 159" fill="none" stroke="#B97A2A" stroke-width="2" marker-end="url(#arw)"/>
+            <path d="M 123 159 A 152 152 0 0 1 255 83" fill="none" stroke="#B97A2A" stroke-width="2" marker-end="url(#arw)"/>
+          </g>
+          <!-- 局外环 -->
+          <g font-family="Noto Sans SC,sans-serif">
+            <circle cx="755" cy="235" r="150" fill="none" stroke="#343F30" stroke-width="2" stroke-dasharray="4 6"/>
+            <circle cx="755" cy="235" r="112" fill="none" stroke="#343F30" stroke-width="1" stroke-dasharray="2 4"/>
+            <text x="755" y="30" text-anchor="middle" font-size="15" font-weight="700" fill="#EDE7D8">局外循环 · 长线养成</text>
+            <g><circle cx="755" cy="125" r="34" fill="#293228" stroke="#B97A2A" stroke-width="2"/><text x="755" y="131" text-anchor="middle" font-size="14" font-weight="700" fill="#EDE7D8">结算</text><text x="755" y="76" text-anchor="middle" font-size="10.5" fill="#8B9083">金币 / 经验 / 碎片</text></g>
+            <g><circle cx="865" cy="235" r="34" fill="#293228" stroke="#B97A2A" stroke-width="2"/><text x="865" y="241" text-anchor="middle" font-size="14" font-weight="700" fill="#EDE7D8">养成</text><text x="952" y="231" text-anchor="middle" font-size="10.5" fill="#8B9083">冈布奥升星 / 炼金</text></g>
+            <g><circle cx="755" cy="345" r="34" fill="#293228" stroke="#B97A2A" stroke-width="2"/><text x="755" y="351" text-anchor="middle" font-size="14" font-weight="700" fill="#EDE7D8">备战</text><text x="755" y="414" text-anchor="middle" font-size="10.5" fill="#8B9083">阵容 / 神器 / 药剂</text></g>
+            <g><circle cx="645" cy="235" r="34" fill="#293228" stroke="#B97A2A" stroke-width="2"/><text x="645" y="241" text-anchor="middle" font-size="14" font-weight="700" fill="#EDE7D8">进图</text><text x="566" y="231" text-anchor="middle" font-size="10.5" fill="#8B9083">体力再入地牢</text></g>
+            <path d="M 755 85 A 150 150 0 0 1 905 235" fill="none" stroke="#B97A2A" stroke-width="2" marker-end="url(#arw)"/>
+            <path d="M 905 235 A 150 150 0 0 1 755 385" fill="none" stroke="#B97A2A" stroke-width="2" marker-end="url(#arw)"/>
+            <path d="M 755 385 A 150 150 0 0 1 605 235" fill="none" stroke="#B97A2A" stroke-width="2" marker-end="url(#arw)"/>
+            <path d="M 605 235 A 150 150 0 0 1 755 85" fill="none" stroke="#B97A2A" stroke-width="2" marker-end="url(#arw)"/>
+          </g>
+          <!-- 连接 -->
+          <g font-family="Noto Sans SC,sans-serif">
+            <path d="M 420 235 L 588 235" fill="none" stroke="#8B9083" stroke-width="2" marker-end="url(#arw)" stroke-dasharray="6 5"/>
+            <path d="M 588 205 L 420 205" fill="none" stroke="#8B9083" stroke-width="2" marker-end="url(#arw)" stroke-dasharray="6 5"/>
+            <text x="499" y="180" text-anchor="middle" font-size="11" fill="#AFA990">带出：金币 / 经验 / 碎片</text>
+            <text x="499" y="268" text-anchor="middle" font-size="11" fill="#AFA990">带入：阵容 / 神器 / 药剂</text>
+          </g>
+        </svg>
+        <div class="loop-legend">
+          <span><b>翻砖</b>翻开未知地砖</span><span><b>遭遇</b>敌人 / 道具 / 事件</span><span><b>决策</b>战 / 避 / 用卷轴</span><span><b>战斗</b>攻击 / 魔法 / 机关</span><span><b>收获</b>探索点 / 装备 / 卷轴</span><span><b>下楼</b>钥匙开门进下层</span>
+        </div>
+
+        <!-- 移动端纵向版 -->
+        <div class="loop-mobile" style="width:100%">
+          <p style="color:#EDE7D8;font-weight:700;margin-bottom:4px">局内循环 · 每一层</p>
+          <div class="step-row"><span class="n">1</span><div><b>翻砖</b> — 翻开未知地砖，暴露敌人 / 道具 / 事件</div></div>
+          <div class="step-row"><span class="n">2</span><div><b>遭遇</b> — 决定是战斗、规避还是先发育</div></div>
+          <div class="step-row"><span class="n">3</span><div><b>战斗</b> — 攻击 / 魔法 / 机关，承受反击或远程火力</div></div>
+          <div class="step-row"><span class="n">4</span><div><b>收获</b> — 探索点、装备、卷轴、食材矿石</div></div>
+          <div class="step-row"><span class="n">5</span><div><b>下楼</b> — 拿到钥匙开下一层，每 10 层迎战 BOSS</div></div>
+          <p style="color:#EDE7D8;font-weight:700;margin:14px 0 4px">局外循环 · 长线养成</p>
+          <div class="step-row"><span class="n">结</span><div><b>结算</b> — 迷宫内资源换算为金币 / 经验 / 碎片</div></div>
+          <div class="step-row"><span class="n">养</span><div><b>养成</b> — 冈布奥升星、炼金坊、DP 成就推进</div></div>
+          <div class="step-row"><span class="n">备</span><div><b>备战</b> — 选定出战阵容、神器、探险药剂</div></div>
+          <div class="step-row"><span class="n">进</span><div><b>进图</b> — 消耗体力，重新进入迷宫</div></div>
+        </div>
+      </div>
+      <figcaption>核心玩法双循环：局内循环承载即时决策，局外循环承接长线目标，两套经济体系通过「结算 / 备战」双向衔接</figcaption>
+    </figure>
+
+    <div class="cards reveal">
+      <div class="card"><h4><span class="ic">1</span>动作极简，决策极密</h4><p>全部操作收敛为「点砖」与「战斗」，但每个点按都携带风险决策——翻砖成本是生命与轮次，收益是资源与信息。操作门槛被压到最低，策略密度被顶到最高。</p></div>
+      <div class="card"><h4><span class="ic">2</span>两套经济，互不污染</h4><p>局内探索点只购买局内成长，局外只结算「成长货币」。玩家既不用局外数值碾压单局，也不会因单局失败丢失长期积累——失败成本被设计成「零」。</p></div>
+      <div class="card"><h4><span class="ic">3</span>软性 Roguelike</h4><p>死亡即重开，符合 Roguelike 的「进程单向」；但冈布奥、碎片、DP 永不重置，变强是确定性的。随机性负责过程新鲜，确定性负责结果承诺。</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 03 地牢探索机制 ===== -->
+<section class="section" id="s3">
+  <div class="shell">
+    <div class="sec-head reveal"><span class="sec-num">CHAPTER 03</span><h2>地牢探索机制：翻砖与信息博弈</h2></div>
+    <div class="sec-rule reveal"></div>
+    <p class="lede reveal">探索层是整款游戏的地基。所有战斗、成长、收集、彩蛋都挂在「翻开一块地砖」这一个动作上。它借鉴扫雷的信息博弈，让「未知」本身成为可消费的乐趣。</p>
+
+    <div class="two reveal">
+      <div>
+        <h3 class="block">5×6 棋盘与翻砖规则</h3>
+        <p class="body">每层迷宫由一张 <b>5×6 的棋盘</b>构成，砖块初始全部覆盖。玩家只能翻开与已探索区域相邻的砖块，砖下可能是敌人、探索点、血瓶、魔法卷轴、钥匙、商店或随机事件。</p>
+        <p class="body">翻出敌人必须击败（或绕路规避）才能继续操作；翻出道具即时结算。全层翻完并击杀所有敌人可达成<b>「完美击败」</b>，获得额外奖励。</p>
+        <p class="body">每层的唯一硬目标只有一件——<b>找到钥匙，打开大门，进入下一层</b>。其余一切（翻全图、清全怪、进洞穴、逛商店）都是玩家自选的加分项。</p>
+        <p class="body">这一设计把「完成目标」与「探索收益」做成了持续博弈：<b>是见好就收快速下楼，还是冒险翻完全图换更高收益</b>——每层都在发生，且答案随血线、资源与楼层深度变化。</p>
+      </div>
+      <div class="photos">
+        <div class="photo"><img src="https://media.doubao.com/space/api/box/stream/download/all_by_mount_point/KBgIbZomBoHFazxPYzPcdv6ynXe" alt="不思议迷宫翻砖探索截图（5层）"><span>「出发吧！5 层」——未翻开的砖块与已暴露的怪物、机关共存</span></div>
+        <div class="photo"><img src="https://media.doubao.com/space/api/box/stream/download/all_by_mount_point/FpZ3bBaBBoODtVxUYsFcGHA7nSg" alt="冒险者之森19层探索截图"><span>「冒险者之森 19 层」——商店、怪物、宝箱、卷轴在同一层随机分布</span></div>
+      </div>
+    </div>
+
+    <div class="cards reveal" style="margin-top:20px">
+      <div class="card"><h4><span class="ic">知</span>信息即资源</h4><p>「每层侦查 N 个敌人位置」是称号天赋，罗盘、真眼等道具揭示更多信息——买信息、换安全，是探索层最直接的货币化设计。</p></div>
+      <div class="card"><h4><span class="ic">赌</span>可控的赌博</h4><p>翻砖是低成本的随机事件：坏结果最多损失血线与轮次，好结果可能是神装。高频小赌注让随机性始终「可承受」。</p></div>
+      <div class="card"><h4><span class="ic">快</span>节奏自选</h4><p>层内节奏完全由玩家掌控——可以全清慢推，也可以直奔钥匙速通；目标不同（DP / 隐藏 / 冲层 / 刷资源），探索策略完全不同。</p></div>
+    </div>
+
+    <h3 class="block reveal">BOSS 节奏：每 10 层一次压力峰</h3>
+    <p class="body reveal">楼层推进采用固定节拍器：普通层是「平缓积累」，每 10 层强制插入 BOSS 关卡，检查玩家本段发育是否达标。BOSS 会翻出全图、锁住出口，迫使玩家用掉攒下的卷轴与道具——形成「积累 → 释放 → 再积累」的呼吸感。</p>
+    <div class="rhythm reveal">
+      <div class="rhy"><b>1–9 层</b><span>熟悉机制 / 发育</span></div>
+      <div class="rhy boss"><b>10 层</b><span class="flag">BOSS</span><span>阶段验收</span></div>
+      <div class="rhy"><b>11–19 层</b><span>新机制解锁</span></div>
+      <div class="rhy boss"><b>20 层</b><span class="flag">BOSS</span><span>资源压力上升</span></div>
+      <div class="rhy"><b>21–29 层</b><span>难度爬坡</span></div>
+      <div class="rhy boss"><b>30+ 层</b><span class="flag">BOSS</span><span>隐藏 / DP 关键区</span></div>
+      <div class="rhy"><b>无尽高层</b><span>数值长线</span></div>
+    </div>
+
+    <div class="two reveal" style="margin-top:10px">
+      <div>
+        <h3 class="block">随机生成与 S/L：Roguelike 的「后悔药」</h3>
+        <p class="body">地图、怪物、奖励每局随机，但开发者为长局体验设计了<b>「暂离」</b>：暂停后怪物位置与奖励会被保存；强制退出后 20 分钟内重进，仅位置重置（玩家称<b>小 SL</b>）；超过 20 分钟，怪物与奖励整体重掷（<b>大 SL</b>）。</p>
+        <p class="body">这套机制把「不可挽回」的 Roguelike 铁律软化了一层：既保留了随机生成的新鲜感，又给爬高玩家留出「重刷开局 / 刷隐藏」的空间，是长线运营的隐性润滑剂。</p>
+      </div>
+      <div>
+        <h3 class="block">三种挑战模式：同一玩法，三种调性</h3>
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <colgroup><col style="width:22%"><col style="width:30%"><col style="width:24%"><col style="width:24%"></colgroup>
+            <thead><tr><th>模式</th><th>规则</th><th>解锁条件</th><th>设计定位</th></tr></thead>
+            <tbody>
+              <tr><td><b>普通模式</b></td><td>有限层数挑战，通关即胜</td><td>每张新迷宫先通关若干次普通</td><td>教学与剧情入口，阶段性体验</td></tr>
+              <tr><td><b>无尽模式</b></td><td>无限层数，越深越难</td><td>通关该迷宫普通模式</td><td>隐藏冈布奥 / DP / 刷资源的主战场</td></tr>
+              <tr><td><b>扫荡模式</b></td><td>一键结算，跳过操作</td><td>获得强盗冈布奥后解锁</td><td>快速刷资源，缓解「肝」的退出压力</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="small">扫荡收益由对应冈布奥数量、迷宫 DP 进度加成，是「用长期投入换操作时间」的取舍设计。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 04 战斗系统 ===== -->
+<section class="section" id="s4">
+  <div class="shell">
+    <div class="sec-head reveal"><span class="sec-num">CHAPTER 04</span><h2>战斗系统：回合博弈与卷轴资源</h2></div>
+    <div class="sec-rule reveal"></div>
+    <p class="lede reveal">战斗没有复杂操作，本质是一场<b>回合制资源交换</b>：生命换输出、魔法值换爆发、卷轴换局面。怪物 AI 只有两类行为模式，但配合数值与特殊技能后，构成了绝大多数决策深度。</p>
+
+    <div class="cards reveal">
+      <div class="card"><h4><span class="ic">近</span>近程怪物</h4><p>平时不行动，<b>只在玩家攻击它时反击</b>。攻击前需预估自身承伤；可用远程手段或状态法术先手削弱。</p></div>
+      <div class="card"><h4><span class="ic">远</span>远程怪物</h4><p>按固定轮数自动攻击，角落的<b>漏斗倒计时</b>直观提示剩余轮数。它逼玩家「要么速杀、要么先控住」。</p></div>
+      <div class="card"><h4><span class="ic">魔</span>魔法攻击</h4><p>消耗<b>卷轴 + 魔法值</b>施放，伤害受魔力影响，<b>不会招来反击</b>；三阶以上卷轴需学习称号解锁。</p></div>
+    </div>
+
+    <div class="two reveal" style="margin-top:22px">
+      <div>
+        <h3 class="block">卷轴体系：6 系 × 6 阶的组合池</h3>
+        <p class="body">元素魔法按火、水、土、气、光、暗六系划分，每系一至五阶加一阶限一次的特殊魔法，共 36 种。前两阶是基础牌，中阶开始引入「翻开石板」「时间停止」「大地之门回退」等<b>影响探索节奏本身</b>的魔法——卷轴不止是伤害手段，更是探索工具。</p>
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <colgroup><col style="width:8%"><col style="width:15%"><col style="width:15%"><col style="width:15%"><col style="width:15%"><col style="width:16%"><col style="width:16%"></colgroup>
+            <thead><tr><th>系</th><th>一阶</th><th>二阶</th><th>三阶</th><th>四阶</th><th>五阶</th><th>六阶（限一次）</th></tr></thead>
+            <tbody>
+              <tr><td><b>火</b></td><td>火球术<span class="sub">单体攻击</span></td><td>失明术<span class="sub">降命中，不看石板 4 轮</span></td><td>流星雨<span class="sub">单体攻击</span></td><td>毁灭之刃<span class="sub">攻击提升且不受反击 5 轮</span></td><td>末日审判<span class="sub">翻开全图 + 全体攻击 + 燃烧</span></td><td>毁灭终章<span class="sub">击穿 5 层斩杀全体，BOSS 减半</span></td></tr>
+              <tr><td><b>水</b></td><td>治疗术<span class="sub">回复生命</span></td><td>寒冰护盾<span class="sub">吸收伤害</span></td><td>冰锥术<span class="sub">单体 + 无法行动 2 轮</span></td><td>痊愈术<span class="sub">回复 + 清负面</span></td><td>极光屏障<span class="sub">吸收伤害</span></td><td>精灵赞歌<span class="sub">召唤水精灵，持续 10 层</span></td></tr>
+              <tr><td><b>土</b></td><td>石肤术<span class="sub">减伤 3 轮</span></td><td>地震术<span class="sub">翻开若干石板</span></td><td>地刺术<span class="sub">翻开整列 + 同列全体攻击</span></td><td>超重力<span class="sub">单体 + 无法反击 3 轮</span></td><td>大地之门<span class="sub">回退若干层</span></td><td>盖亚的祝福<span class="sub">进入特殊空间</span></td></tr>
+              <tr><td><b>气</b></td><td>闪电术<span class="sub">单体攻击</span></td><td>静电场<span class="sub">魔力提升 4 轮</span></td><td>瓦解射线<span class="sub">所受伤害增加 4 轮</span></td><td>闪电链<span class="sub">单体 + 溅射</span></td><td>时间停止<span class="sub">敌人停摆 + 不受反击 8 轮</span></td><td>时间加速<span class="sub">法术连放三次，持续 5 轮</span></td></tr>
+              <tr><td><b>光</b></td><td>祝福术<span class="sub">攻击提升，不被闪避 3 轮</span></td><td>圣光弹<span class="sub">单体伤害</span></td><td>神恩术<span class="sub">回复 + 清除诅咒</span></td><td>天堂之拳<span class="sub">范围内全体攻击</span></td><td>神圣重生<span class="sub">下次死亡自动复活回血</span></td><td>圣光守护<span class="sub">攻魔 +20 免疫伤害，持续本层</span></td></tr>
+              <tr><td><b>暗</b></td><td>诅咒术<span class="sub">降敌攻击 4 轮</span></td><td>死亡波纹<span class="sub">全体攻击</span></td><td>吸能术<span class="sub">攻击吸血 3 轮</span></td><td>变形术<span class="sub">降攻降血并消除特性</span></td><td>内爆术<span class="sub">单体攻击</span></td><td>亡者召唤<span class="sub">按杀敌数召唤死者作战</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="tbl-cap">基础卷轴池（据官方资料整理，效果为要点概括）——六阶均为「限一次」的终局型资源，通常留给 BOSS 层</p>
+      </div>
+      <div>
+        <h3 class="block">战斗之外的资源面</h3>
+        <p class="body"><b>装备与套装</b>：装备分部位穿戴，凑齐整套触发套装效果。战斗套（骑士 / 秩序 / 暗影 / 龙鳞 / 神谕）、魔法套、元素套、特殊套（贵族 / 猎人 / 永恒等）共 20+ 套——「为哪套去商店刷件」是局内长线目标之一。</p>
+        <p class="body"><b>探险药剂</b>：进图前选择一瓶，按 1–4 阶提供战斗、恢复或资源加成，是阵容外最小的局外决策单元。</p>
+        <p class="body"><b>攻击装置与迷宫机关</b>：每座迷宫内置不同的攻击装置——「猴子」每隔数回合助战一次、祭坛可用宝石组合出近百种效果、摇奖机、爆炸桶等。战斗不只在玩家与怪物之间发生，<b>地图本身也是武器</b>。</p>
+        <p class="body"><b>特殊魔法体系</b>：龙语魔法（向神龙许愿习得，消耗龙力值）、圣者之语（圣者之塔专属，消耗光暗元素结晶）——为特定内容提供差异化的「第三资源」。</p>
+        <div class="quote">
+          <p>战斗设计的核心不是「操作」，而是<b>读图与取舍</b>：先杀远程还是先破盾、这轮用不用卷轴、这张卷轴留给本层还是攒到 BOSS——每一轮都在做小规模资源分配。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 05 局内成长 ===== -->
+<section class="section" id="s5">
+  <div class="shell">
+    <div class="sec-head reveal"><span class="sec-num">CHAPTER 05</span><h2>局内成长：探索点经济与称号树</h2></div>
+    <div class="sec-rule reveal"></div>
+    <p class="lede reveal">局内成长只有一条主线——探索点。翻砖、杀敌、称号、道具都在产出探索点，而探索点的两个去向（称号、商店）共同构成单局内的「构筑」深度。它被刻意设计为<b>带不出迷宫</b>：让每一局从零开始决策。</p>
+
+    <div class="two reveal">
+      <div>
+        <h3 class="block">探索点的生产与消费</h3>
+        <p class="body"><b>生产</b>：翻砖、击杀怪物、拾取探索符石、进阶称号；冒险系称号可直接提升每层探索点收益——「探索效率」本身被做成了一条可加点路线。</p>
+        <p class="body"><b>消费</b>：主要投入称号树；其次是在迷宫商店购买装备与卷轴。特殊迷宫另有特色商店（海盗之港的酒吧、走私者商店等）出售专属道具。</p>
+        <p class="body"><b>设计意图</b>：局内资源「只在本局滚雪球」，杜绝了用局外数值碾压单局的可能，也让「开局怎么点称号」成为每一局的第一道决策题。</p>
+      </div>
+      <div class="fig-frame reveal">
+        <div id="radarChart" style="width:100%;height:360px"></div>
+        <figcaption>三职系能力画像（示意：基于官方职系定位整理）——冒险均衡且探索向强，战斗偏攻防，魔法偏魔力与卷轴</figcaption>
+      </div>
+    </div>
+
+    <h3 class="block reveal">称号树：局内最大的构筑深度</h3>
+    <p class="body reveal">称号即职业天赋树，单线解锁：低级称号满足条件后解锁高级称号。三支主干对应三种角色定位，另有巨龙系等特殊分支（共 22/22/22/6 个称号节点）。称号不仅给属性，还<b>解锁卷轴使用上限、道具与主动能力</b>——「先点出毁灭公爵还是先出位面先知」直接改变本局打法。</p>
+    <div class="cards g4 reveal">
+      <div class="card"><h4><span class="ic">冒</span>冒险系</h4><p>属性均衡，探索向最强：探索点加成、侦查信息、降低称号开销，是「探索流」的引擎。</p></div>
+      <div class="card"><h4><span class="ic">战</span>战斗系</h4><p>攻击与生命突出，普通攻击附带特殊效果（吸血、溅射、几率法术），前期最稳。</p></div>
+      <div class="card"><h4><span class="ic">魔</span>魔法系</h4><p>魔力与魔法值突出，依赖卷轴；前期偏弱、后期爆发，成长曲线最长。</p></div>
+      <div class="card"><h4><span class="ic">龙</span>特殊分支</h4><p>巨龙系由神龙许愿习得（自带前三阶称号）；恶魔、机器等按迷宫特色延伸。</p></div>
+    </div>
+    <div class="quote reveal" style="margin-top:16px">
+      <p><b>启示</b>：称号树不是「技能列表」，而是「策略声明」——玩家在进图后的前十几层就在为整局定调，这种早期承诺带来长线期待，是 Roguelike 构筑感的经典做法。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 06 角色系统 ===== -->
+<section class="section" id="s6">
+  <div class="shell">
+    <div class="sec-head reveal"><span class="sec-num">CHAPTER 06</span><h2>角色系统：冈布奥与灵魂链接</h2></div>
+    <div class="sec-rule reveal"></div>
+    <p class="lede reveal">角色是长线收集的核心。冈布奥从世界树上诞生、外形是史莱姆的萌系变体（原型受《勇者斗恶龙》史莱姆启发后重新设计），200+ 只角色大量「捏他」动漫、影视与游戏经典形象——<b>收集本身即是彩蛋</b>。</p>
+
+    <div class="two reveal">
+      <div class="photos">
+        <div class="photo"><img src="https://media.doubao.com/space/api/box/stream/download/all_by_mount_point/Qye6bgFVkogacLx0FfScT7yZnGg" alt="蛇神冈布奥立绘"><span>蛇神冈布奥——神话主题角色，每只冈布奥自带天赋与专属技能</span></div>
+        <div class="photo"><img src="https://media.doubao.com/space/api/box/stream/download/all_by_mount_point/EfCxbEsOaonbkAxAahxcWO8mnRf" alt="骑士冈布奥立绘"><span>骑士冈布奥——战斗系角色，专属技能决定其出战定位</span></div>
+      </div>
+      <div>
+        <h3 class="block">天赋 × 专属技能：双重角色价值</h3>
+        <p class="body"><b>天赋</b>：作用于全体同阵营冈布奥，即使不上场也生效——这让「收集」直接转化为「全队数值」，收集本身有了收益闭环。</p>
+        <p class="body"><b>专属技能</b>：仅该冈布奥出战（或灵魂链接）时生效，定义其战术身份：召狗的二郎神、秒杀型国王、召唤系虫族女王……</p>
+        <p class="body"><b>灵魂链接</b>：出战 1 只，可再链接 2 只<b>同阵营</b>冈布奥，携带其专属技能。三技能同时生效带来「组合数学」级的配队空间——上千种组合是游戏对外宣称的核心卖点之一。</p>
+        <h3 class="block">养成与升星路径</h3>
+        <p class="body">喂食 + 专属武器（炼金材料合成）+ 专属证（同款碎片合成）→ 升星至 Lv5；Lv5 后挑战<b>神庙试炼</b>（击败自身镜像，只能靠称号与关卡道具策略取胜），成功建立雕像升至 Lv6。冈布奥宝宝另以「恋人」命运之链等方式获得，天赋加成全体或特定职系。</p>
+      </div>
+    </div>
+
+    <div class="two reveal" style="margin-top:16px">
+      <div>
+        <h3 class="block">四阵营：灵魂链接的硬约束</h3>
+        <p class="body">冈布奥分属四个阵营，灵魂链接被限制在<b>同阵营内</b>。这既是世界观设定，也是配队平衡器——它把「数百种组合」压缩成「每阵营内的组合」，避免全角色大乱炖导致的最优解垄断。</p>
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <colgroup><col style="width:24%"><col style="width:38%"><col style="width:38%"></colgroup>
+            <thead><tr><th>阵营</th><th>文化内核</th><th>代表角色（示例）</th></tr></thead>
+            <tbody>
+              <tr><td><b>奥鲁维之刃</b></td><td>战争帝国，崇尚战斗技巧与骑士信念</td><td>冒险者、剑士、雅典娜、神圣巨龙</td></tr>
+              <tr><td><b>卡纳斯的启示</b></td><td>智慧帝国，富饶之地，世界树诞生于此</td><td>世界树、贵族、王者、小魔女</td></tr>
+              <tr><td><b>游荡者之歌</b></td><td>不死帝国，沙漠废墟与不死生物乐园</td><td>强盗、幽灵船长、神龙、塔罗牌</td></tr>
+              <tr><td><b>深渊的咆哮</b></td><td>机械帝国达卡，掌握黑暗能量，疆域最广</td><td>克苏鲁、女巫、血魔、狂战士</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div>
+        <h3 class="block">收集途径：把每个系统都变成角色来源</h3>
+        <p class="body">冈布奥碎片来自：黄金之罐（指定阵营抽取）、每座迷宫 2 只（普通模式通关 1 只 + 无尽模式隐藏 1 只）、天空事件、活动副本、命运之链、扫荡、彩蛋（如冒险者之森反复对话收编勇者）。</p>
+        <p class="body"><b>「每座迷宫藏 1 只隐藏冈布奥」</b>是探索动机的放大器——它把「爬高层」从数值追求变成解谜任务：出云岛献祭八岐大蛇、英雄之村刷满佐罗面罩、地狱边境收集恶魔之心……隐藏角色的获取本身就是一段玩法教程。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 07 局外长线与内容层 ===== -->
+<section class="section" id="s7">
+  <div class="shell">
+    <div class="sec-head reveal"><span class="sec-num">CHAPTER 07</span><h2>局外长线：成就、许愿与内容层</h2></div>
+    <div class="sec-rule reveal"></div>
+    <p class="lede reveal">局外系统的共同职责是给「再进一次迷宫」提供理由。它们不抢走迷宫的戏份，而是把迷宫变成资源来源与目标舞台——迷宫是主菜，局外系统全是配菜与佐料。</p>
+
+    <div class="cards g2 reveal">
+      <div class="card">
+        <h4><span class="ic">树</span>世界树 + 炼金坊</h4>
+        <p>世界树是世界观载体，也是冈布奥的「出生地」；炼金坊离线采集矿物资源，用于合成专属武器与探索试剂——把长线资源获取做成放置型收菜，降低日常负担。</p>
+      </div>
+      <div class="card">
+        <h4><span class="ic">D</span>DP 成就系统</h4>
+        <p>每个迷宫内置数十条 DP 任务（杀怪次数、抵达层数、触发陷阱、特殊事件）。DP 解锁新迷宫与扫荡——<b>「把玩法目标翻译成探索任务」</b>，是引导玩家体验全部机制的核心工具。</p>
+      </div>
+      <div class="card">
+        <h4><span class="ic">龙</span>神龙许愿</h4>
+        <p>迷宫内收集 7 颗龙珠可召唤神龙，三选一许愿：资源、装备、龙语魔法或收藏品。「随机掉落 + 攒齐兑现」把长线期待锚定在每一层探索里。</p>
+      </div>
+      <div class="card">
+        <h4><span class="ic">空</span>天空战 / 伊甸园 / 外域</h4>
+        <p>飞艇探索与掠夺（战力 / 火力 / 装甲 / 机动 / 幸运五维）；伊甸园八个区域逐区修复解锁功能；外域做跨服长线。均为迷宫玩法的资源出口与收集扩展。</p>
+      </div>
+    </div>
+
+    <div class="two reveal" style="margin-top:18px">
+      <div>
+        <h3 class="block">内容层：给「重复挑战」不断换皮</h3>
+        <p class="body">Roguelike 的天敌是重复感。《不思议迷宫》用三层内容持续刷新同一玩法：<b>新迷宫</b>（31+ 座，每座新机制）、<b>新冈布奥</b>（200+ 只，新的配队组合）、<b>活动副本</b>（天空活动、竞速迷宫、二周年职员彩蛋迷宫等限时内容）。</p>
+        <p class="body"><b>竞速迷宫</b>：系统随机给 12 只冈布奥，30 层限时逃生、每层坍塌倒计时——把「爬楼」从数值验证变成限时竞速，是同一套玩法下的全新情绪。</p>
+      </div>
+      <div>
+        <h3 class="block">地图编辑器：UGC 的早期尝试</h3>
+        <p class="body">2017 年公测即上线地图编辑器，玩家可自由设置迷宫物件、触发事件与地形属性，衍生出密室逃脱、扫雷、魔兽 RPG 等玩法。它把「地牢玩法」从消费端延伸到创作端——玩家既是玩家，也是关卡设计师。</p>
+        <div class="quote">
+          <p><b>启示</b>：局外系统全部服务于「制造下一个进图理由」，而地图编辑器把理由的产能开放给了玩家——这是低成本的长线内容引擎。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 08 迷宫差异化 ===== -->
+<section class="section" id="s8">
+  <div class="shell">
+    <div class="sec-head reveal"><span class="sec-num">CHAPTER 08</span><h2>迷宫差异化：一座迷宫，一套新规则</h2></div>
+    <div class="sec-rule reveal"></div>
+    <p class="lede reveal">这是《不思议迷宫》最鲜明的设计主张：<b>每座迷宫都有自己的文化内核与独特机制</b>——阿拉丁神灯的许愿机制、克苏鲁神话的心智值系统……官方称「每个迷宫都能独立成一个游戏」。机制变体让同一套底层玩法获得持续新鲜感。</p>
+
+    <div class="tbl-wrap reveal">
+      <table class="tbl">
+        <colgroup><col style="width:18%"><col style="width:26%"><col style="width:36%"><col style="width:20%"></colgroup>
+        <thead><tr><th>迷宫（示例）</th><th>文化内核</th><th>独特机制 / 代表性内容</th><th>设计作用</th></tr></thead>
+        <tbody>
+          <tr><td><b>冒险者之森</b></td><td>新手冒险起点</td><td>男巫小屋隐藏冈布奥；反复对话收编「勇者」</td><td>新手教学 + 首个隐藏角色</td></tr>
+          <tr><td><b>英雄之村</b></td><td>佐罗式侠盗传奇</td><td>佐罗面罩随击杀强盗升级，满级后 BOSS 层招募佐罗</td><td>「长期行为 → 隐藏回报」</td></tr>
+          <tr><td><b>遗落圣坛</b></td><td>远古祭坛文明</td><td>祭坛用四种宝石组合出近百种不同效果</td><td>组合式解谜，构建向玩法</td></tr>
+          <tr><td><b>混沌深渊</b></td><td>克苏鲁神话</td><td>心智（SAN）值系统：状态随数值滑向疯狂，影响恢复、陷阱与伤害浮动</td><td>「状态资源化」的数值实验</td></tr>
+          <tr><td><b>圣者之塔</b></td><td>奇幻魔法学院</td><td>专属「圣者之语」魔法，收集光暗元素结晶释放</td><td>第三套魔法资源体系</td></tr>
+          <tr><td><b>沙漠绿洲</b></td><td>阿拉丁神话</td><td>神灯许愿机制，围绕许愿次数构建策略</td><td>「愿望」式随机奖励池</td></tr>
+          <tr><td><b>海盗之港</b></td><td>大航海海盗文化</td><td>海盗酒馆、走私者商店等特色商店</td><td>经济向迷宫变体</td></tr>
+          <tr><td><b>诸神的棋盘</b></td><td>神明棋局</td><td>献祭 / 不献祭双路线，受伤棋子、琥珀棋子收集</td><td>路线选择与隐藏收集</td></tr>
+          <tr><td><b>山海秘境</b></td><td>东方修仙</td><td>筑基、金丹、渡劫的修仙成长线，劫雷杀 BOSS</td><td>把「成长」包装成修仙叙事</td></tr>
+          <tr><td><b>出云岛</b></td><td>和风神话</td><td>逢 9 层遇八岐大蛇雕像，献祭 8 次酒招募</td><td>「献祭积累 → 隐藏解锁」</td></tr>
+          <tr><td><b>古代竞技场</b></td><td>罗马角斗</td><td>角斗台观众可全体攻击刷资源</td><td>资源彩蛋与恶趣味</td></tr>
+          <tr><td><b>下一个千年</b></td><td>千年之后的世界</td><td>Steam 专属迷宫，通关「混沌深渊」后开启</td><td>情怀回顾 + 平台独占内容</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="tbl-cap">迷宫机制变体示例（据公开攻略与官方资料整理）——同一套翻砖框架，每座迷宫换一套「新规则」</p>
+
+    <div class="two reveal">
+      <div>
+        <h3 class="block">案例拆解：混沌深渊的心智值系统</h3>
+        <p class="body">克苏鲁主题迷宫把「理智值」做成全局状态资源：从正常滑向疯狂，每一步都改变玩法规则。它不是单纯的数值压力，而是<b>让玩家主动选择「保持什么状态」</b>——高理智稳定、低理智有额外收益但风险激增，形成状态取舍。</p>
+        <div class="san">
+          <div class="san-item san-1"><span class="r">75 ≤ SAN ≤ 100</span><h5>正常</h5><ul><li>无特殊状态，稳定发育</li></ul></div>
+          <div class="san-item san-2"><span class="r">50 ≤ SAN &lt; 75</span><h5>烦躁</h5><ul><li>拾取恢复瓶时恢复量 -30%</li></ul></div>
+          <div class="san-item san-3"><span class="r">25 ≤ SAN &lt; 50</span><h5>混乱</h5><ul><li>恢复量继续 -30%</li><li>遭遇更多种类陷阱</li></ul></div>
+          <div class="san-item san-4"><span class="r">SAN &lt; 25</span><h5>疯狂</h5><ul><li>伤害在 70%–200% 间浮动</li><li>陷阱更多、恢复更低</li></ul></div>
+        </div>
+        <p class="small">SAN 归零即死亡；怪物如黑暗触须会在反击时降低玩家心智——战斗、探索、资源三条线被同一根数值串起来。</p>
+      </div>
+      <div>
+        <h3 class="block">机制变体如何服务文化内核</h3>
+        <p class="body">每个机制变体不是随机发明，而是从文化母题里长出来的：<b>修仙图就该有渡劫，克苏鲁图就该有理智，海盗图就该有走私生意</b>。机制与题材互相论证，玩家理解成本趋近于零——看到「SAN 值」的瞬间就懂了这图的规则气质。</p>
+        <p class="body">变体还承担教学分工：普通层教基础、迷宫特色层教本图专属机制、无尽模式用深层层数复现并强化。每座迷宫 = 一套机制 + 一套目标（DP + 隐藏） + 一套收集（2 只冈布奥），<b>可玩性被模块化</b>。</p>
+        <div class="quote">
+          <p><b>启示</b>：低成本的内容扩展方式是「保留底层玩法，替换规则层」——翻砖框架不变，换一套规则就等于一座新游戏。前提是每套新规则都必须与题材强绑定，让玩家一眼理解、立刻想试。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 09 设计亮点与可借鉴点 ===== -->
+<section class="section" id="s9">
+  <div class="shell">
+    <div class="sec-head reveal"><span class="sec-num">CHAPTER 09</span><h2>设计亮点与可借鉴点</h2></div>
+    <div class="sec-rule reveal"></div>
+    <p class="lede reveal">回到「地牢玩法」本身，提炼六个值得带走的经验——每一条都指向一个可迁移到同类项目（Roguelike / 益智 / 解谜 / 混合玩法）的设计手法。</p>
+
+    <div class="reveal">
+      <div class="point">
+        <div class="pnum">01</div>
+        <div>
+          <h4>把「未知」商品化：一个动作承载所有系统</h4>
+          <p>翻砖之所以成立，是因为它把「未知」做成可消费的紧张感：信息是资源（侦查、罗盘）、风险是可控的（小赌注）、节奏是自选的。战斗、成长、收集全部挂载在同一个低门槛动作上，新手 10 秒上手，老手十年挖不完。</p>
+          <span class="tk">借鉴：找到那个「所有系统都挂得上去」的最小动作，而不是堆多个复杂入口</span>
+        </div>
+      </div>
+      <div class="point">
+        <div class="pnum">02</div>
+        <div>
+          <h4>每层一个小目标，附加题留给玩家自选</h4>
+          <p>每层的硬目标只有「找钥匙下楼」，但全图探索、完美击败、洞穴、商店、机关是自选加分项。硬目标保证任何玩家都能推进，附加题把「玩法深度」变成玩家自己选择的赌注。</p>
+          <span class="tk">借鉴：硬目标最小化 + 附加题最大化，让同一层对不同玩家呈现不同玩法</span>
+        </div>
+      </div>
+      <div class="point">
+        <div class="pnum">03</div>
+        <div>
+          <h4>状态资源化：把「氛围」变成「数值」</h4>
+          <p>混沌深渊的 SAN 值证明了一个手法：主题氛围可以通过状态资源进入机制层——理智影响恢复、陷阱、伤害浮动，玩家主动选择「保持什么精神状态」。题材因此不只是皮，而是规则的一部分。</p>
+          <span class="tk">借鉴：给抽象主题（理智、信仰、污染）一个会变化的数值，并让玩家承担选择的后果</span>
+        </div>
+      </div>
+      <div class="point">
+        <div class="pnum">04</div>
+        <div>
+          <h4>两套经济隔离：失败零成本，变强确定</h4>
+          <p>局内资源只在本局滚雪球、带不出迷宫；局外只结算「成长货币」。玩家永远不会因单局失败损失长期资产，也永远有确定性的变强路径——软 Roguelike 的留存底盘。</p>
+          <span class="tk">借鉴：随机过程 + 确定成长；死亡惩罚设计成「重开」而不是「扣资产」</span>
+        </div>
+      </div>
+      <div class="point">
+        <div class="pnum">05</div>
+        <div>
+          <h4>隐藏内容 = 玩法教程 + 传播钩子</h4>
+          <p>每座迷宫的隐藏冈布奥都要玩家做一套「任务链」（献祭、刷面罩、收集碎片），把玩法机制教学包装成解谜成就感；而「出云岛怎么刷八岐大蛇」这类话题天然适合社区传播，形成攻略生态。</p>
+          <span class="tk">借鉴：把最深的机制留给最执着的玩家，隐藏奖励同时承担教学与话题功能</span>
+        </div>
+      </div>
+      <div class="point">
+        <div class="pnum">06</div>
+        <div>
+          <h4>同一套玩法，两种商业化人格</h4>
+          <p>手游版用体力（红萝卜）、黄金之罐与放置收菜做长线营收；2025 年 Steam 版免费上架，砍掉体力、金罐与天空外域，只留迷宫核心——用「纯净版」重新争取被肝度劝退的玩家与口碑。</p>
+          <span class="tk">借鉴：核心玩法可以在不同商业化容器里复用，平台差异本身就是产品策略</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 10 总结 ===== -->
+<section class="section" id="s10">
+  <div class="shell">
+    <div class="sec-head reveal"><span class="sec-num">CHAPTER 10</span><h2>总结</h2></div>
+    <div class="sec-rule reveal"></div>
+    <div class="two reveal">
+      <div>
+        <p class="body"><b>《不思议迷宫》的地牢玩法可以概括为一句话：</b>用一张 5×6 棋盘上的翻砖动作，把「未知、决策、收集」做成可持续消费的循环——局内靠随机生成与信息博弈提供每层新鲜感，局外靠冈布奥、DP 与迷宫变体提供长线目标，再用彩蛋与隐藏内容把玩家的好奇心变成留存。</p>
+        <p class="body">它的成功验证了一个朴素的判断：<b>轻度的操作可以承载重度的体验</b>，前提是每一层操作背后都有真实的决策、每一段随机背后都有确定性的回报。</p>
+        <p class="body">同样值得警惕的是它的代价：无尽模式一场 2 小时的战线被诟病为「肝」，体力与放置系统稀释了迷宫本身的浓度，后期数值膨胀让部分内容沦为扫荡。它教会我们——<b>玩法框架再精巧，也要靠内容节奏与商业化克制来保护体验</b>。</p>
+      </div>
+      <div class="fig-frame">
+        <h3 class="block">给地牢 / Roguelike 项目的七条速记</h3>
+        <ul class="src-list" style="columns:1">
+          <li>找到一个「所有系统都挂得上去」的最小动作</li>
+          <li>每层硬目标最小化，附加题交给玩家自选</li>
+          <li>把主题氛围翻译成可变化的数值资源</li>
+          <li>局内局外两套经济，失败零成本、变强确定</li>
+          <li>机制变体与题材强绑定，一座迷宫一套新规则</li>
+          <li>隐藏内容同时承担教学与社区传播双重职能</li>
+          <li>用模式（普通 / 无尽 / 扫荡）分层承接不同玩家的时间预算</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 附录与页脚 ===== -->
+<footer class="foot">
+  <div class="shell">
+    <div>
+      <p style="margin-bottom:10px"><b>本拆解文档资料来源</b>（公开资料整理，仅供设计研究参考）：</p>
+      <ul class="src-list">
+        <li><a href="https://zh.moegirl.org.cn/%E4%B8%8D%E6%80%9D%E8%AE%AE%E8%BF%B7%E5%AE%AB">萌娘百科 · 不思议迷宫（迷宫挑战 / 攻击系统 / 称号 / 冈布奥）</a></li>
+        <li><a href="https://m.baike.com/wiki/%E4%B8%8D%E6%80%9D%E8%AE%AE%E8%BF%B7%E5%AE%AB/10552673">抖音百科 · 不思议迷宫（玩法 / 系统 / 数据 / 开发历程 / 评价）</a></li>
+        <li><a href="https://game.leiting.com/list/gumballs">雷霆游戏平台 · 不思议迷宫官方页</a></li>
+        <li><a href="https://apps.apple.com/cn/app/id1156084215">App Store · 不思议迷宫（31 座迷宫介绍）</a></li>
+        <li><a href="https://gumballs.leiting.com/strategy/details.php?id=416">不思议迷宫官网攻略站 · 商店机制</a></li>
+        <li><a href="https://a.9game.cn/wenda/1180801.html">九游 · 混沌深渊心智值系统与打法</a></li>
+        <li><a href="https://games.sina.cn/pi/gp/2018-12-08/detail-ihmutuec7269376.d.html?from=wap">新浪游戏 · 《不思议迷宫》两周年彩蛋观察</a></li>
+        <li><a href="http://m.toutiao.com/group/6592103336785216014/">今日头条 · 翻格子玩法解析</a></li>
+        <li><a href="http://m.toutiao.com/group/6454041983869518349/">今日头条 · 策略地牢冒险评述</a></li>
+      </ul>
+      <p style="margin-top:14px;font-size:12px;color:#8B9083">本文档为玩法机制的设计研究性整理，数据与机制以官方版本为准；图像素材来自公开网络，版权归原厂商所有。</p>
+    </div>
+    <div style="text-align:right"><b>不思议迷宫 · 地牢玩法设计拆解</b><br><span>游戏设计研究文档 · 2026</span></div>
+  </div>
+</footer>
+
+<button id="topBtn" aria-label="返回顶部">↑</button>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+<script>
+(function(){
+  // 移动端目录
+  var navToggle=document.getElementById('navToggle'),navLinks=document.getElementById('navLinks');
+  if(navToggle&&navLinks){navToggle.addEventListener('click',function(){navLinks.classList.toggle('open');});}
+  navLinks && navLinks.querySelectorAll('a').forEach(function(a){a.addEventListener('click',function(){navLinks.classList.remove('open');});});
+
+  // 滚动揭示
+  var reveals=document.querySelectorAll('.reveal');
+  if('IntersectionObserver' in window){
+    var ro=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');ro.unobserve(e.target);}});},{threshold:.08});
+    reveals.forEach(function(el){ro.observe(el);});
+  }else{reveals.forEach(function(el){el.classList.add('in');});}
+
+  // 目录高亮
+  var secs=document.querySelectorAll('section[id]');
+  if('IntersectionObserver' in window){
+    var links={};navLinks&&navLinks.querySelectorAll('a').forEach(function(a){links[a.getAttribute('href')]=a;});
+    var so=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){var id='#'+e.target.id;for(var k in links){links[k].classList.remove('on');}if(links[id])links[id].classList.add('on');}});},{rootMargin:'-20% 0px -70% 0px'});
+    secs.forEach(function(s){so.observe(s);});
+  }
+
+  // 返回顶部
+  var tb=document.getElementById('topBtn');
+  window.addEventListener('scroll',function(){tb.classList.toggle('show',window.scrollY>600);},{passive:true});
+  tb.addEventListener('click',function(){window.scrollTo({top:0,behavior:'smooth'});});
+
+  // 职系雷达图
+  var rc=document.getElementById('radarChart');
+  if(window.echarts&&rc){
+    var opt={
+      tooltip:{trigger:'item',confine:true,backgroundColor:'#22261F',borderColor:'#D9CFB8',textStyle:{color:'#F5F0E6',fontSize:12},formatter:function(p){return p.seriesName+String.fromCharCode(10)+p.name+'：'+p.value;}},
+      legend:{bottom:0,itemWidth:14,itemHeight:10,textStyle:{color:'#565B4F',fontSize:12}},
+      radar:{indicator:[{name:'攻击',max:100},{name:'生命',max:100},{name:'魔力',max:100},{name:'魔法值',max:100},{name:'探索向',max:100}],radius:'62%',center:['50%','46%'],splitNumber:4,
+        axisName:{color:'#565B4F',fontSize:12},
+        splitLine:{lineStyle:{color:'#E2D7BE'}},splitArea:{areaStyle:{color:['rgba(237,229,211,.4)','rgba(245,240,230,.6)']}},
+        axisLine:{lineStyle:{color:'#D9CFB8'}}},
+      series:[{type:'radar',data:[
+        {name:'冒险系',value:[55,60,50,55,85],lineStyle:{color:'#3F6B70',width:2},itemStyle:{color:'#3F6B70'},areaStyle:{color:'rgba(63,107,112,.12)'}},
+        {name:'战斗系',value:[90,88,30,35,45],lineStyle:{color:'#B97A2A',width:2},itemStyle:{color:'#B97A2A'},areaStyle:{color:'rgba(185,122,42,.12)'}},
+        {name:'魔法系',value:[32,42,90,88,50],lineStyle:{color:'#5F8A4B',width:2},itemStyle:{color:'#5F8A4B'},areaStyle:{color:'rgba(95,138,75,.12)'}}
+      ]}]
+    };
+    rc.style.height='340px';
+    var chart=echarts.init(rc);
+    chart.setOption(opt);
+    window.addEventListener('resize',function(){chart.resize();});
+  }else if(rc){
+    rc.innerHTML='<p class="small" style="text-align:center;padding-top:120px">（图表加载失败：三职系定位——冒险均衡探索强 / 战斗攻防突出 / 魔法魔力突出）</p>';
+  }
+})();
+</script>
+</body>
+</html>
